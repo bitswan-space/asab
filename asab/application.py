@@ -103,10 +103,9 @@ class Application(metaclass=Singleton):
 
 		# Load configuration
 
+
 		# Obtain HostName
-		if deployment_id := os.environ.get('DEPLOYMENT_ID'):
-			self.HostName = deployment_id
-		elif container_id_file := os.environ.get('CONTAINER_ID_FILE'):
+		if container_id_file := os.environ.get('CONTAINER_ID_FILE'):
 			while True:
 				try:
 					with open(container_id_file, "r") as f:
@@ -116,6 +115,9 @@ class Application(metaclass=Singleton):
 					time.sleep(1)
 		else:
 			self.HostName = platform.node()
+		# Obtain DeploymentId
+		self.DeploymentId = os.environ.get('DEPLOYMENT_ID', None)
+
 		os.environ['HOSTNAME'] = self.HostName
 		Config._load()
 
