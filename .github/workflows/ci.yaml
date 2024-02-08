@@ -24,7 +24,7 @@ jobs:
         pip install black
         python setup.py install
 
-    - name: Lint with flake8
+    - name: Lint with black
       run: |
         black --check asab
 
