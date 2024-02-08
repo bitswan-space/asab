@@ -7,362 +7,406 @@ from .baseclass import MetricsTestCase
 
 
 class TestAggCounter(MetricsTestCase):
+    def test_agg_counter_01(self):
+        """
+        Resetable Aggregation Counter
+        max
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter",
+            tags={"foo": "bar"},
+            init_values={"value1": 0, "value2": 0},
+        )
 
+        my_counter.set("value1", 20)
+        my_counter.set("value1", 10)
+        self.MetricsService._flush_metrics()
+        my_counter.set("value1", 30)
 
-	def test_agg_counter_01(self):
-		"""
-		Resetable Aggregation Counter
-		max
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			tags={'foo': 'bar'},
-			init_values={'value1': 0, 'value2': 0},
-		)
+        # Test InfluxDB
 
-		my_counter.set('value1', 20)
-		my_counter.set('value1', 10)
-		self.MetricsService._flush_metrics()
-		my_counter.set('value1', 30)
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=20i,value2=0i 153450000000\n",
+                ]
+            ),
+        )
 
-		# Test InfluxDB
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter gauge\n",
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 20\n',
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 0',
+                ]
+            ),
+        )
 
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=20i,value2=0i 153450000000\n",
-			])
-		)
+    def test_agg_counter_02(self):
+        """
+        Resetable Aggregation Counter
+        min
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter",
+            tags={"foo": "bar"},
+            init_values={"value1": 100, "value2": 100},
+            aggregator=min,
+        )
 
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter gauge\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 20\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 0',
-			])
-		)
+        my_counter.set("value1", 20)
+        my_counter.set("value1", 10)
+        self.MetricsService._flush_metrics()
 
+        # Test InfluxDB
 
-	def test_agg_counter_02(self):
-		"""
-		Resetable Aggregation Counter
-		min
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			tags={'foo': 'bar'},
-			init_values={'value1': 100, 'value2': 100},
-			aggregator=min
-		)
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=10i,value2=100i 153450000000\n",
+                ]
+            ),
+        )
 
-		my_counter.set('value1', 20)
-		my_counter.set('value1', 10)
-		self.MetricsService._flush_metrics()
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter gauge\n",
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 10\n',
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 100',
+                ]
+            ),
+        )
 
+    def test_agg_counter_03(self):
+        """
+        Non-resetable Aggregation Counter
+        max
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter",
+            tags={"foo": "bar"},
+            init_values={"value1": 0, "value2": 0},
+            reset=False,
+        )
 
-		# Test InfluxDB
+        my_counter.set("value1", 20)
+        my_counter.set("value1", 10)
+        self.MetricsService._flush_metrics()
+        my_counter.set("value1", 30)
 
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=10i,value2=100i 153450000000\n",
-			])
-		)
+        # Test InfluxDB
 
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter gauge\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 10\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 100',
-			])
-		)
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=20i,value2=0i 123450000000\n",
+                ]
+            ),
+        )
 
-	def test_agg_counter_03(self):
-		"""
-		Non-resetable Aggregation Counter
-		max
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			tags={'foo': 'bar'},
-			init_values={'value1': 0, 'value2': 0},
-			reset=False
-		)
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter gauge\n",
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 30\n',
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 0',
+                ]
+            ),
+        )
 
-		my_counter.set('value1', 20)
-		my_counter.set('value1', 10)
-		self.MetricsService._flush_metrics()
-		my_counter.set('value1', 30)
+    def test_agg_counter_04(self):
+        """
+        Non-resetable Aggregation Counter
+        min
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter",
+            tags={"foo": "bar"},
+            init_values={"value1": 100, "value2": 100},
+            aggregator=min,
+            reset=False,
+        )
 
-		# Test InfluxDB
+        my_counter.set("value1", 20)
+        my_counter.set("value1", 10)
+        self.MetricsService._flush_metrics()
+        my_counter.set("value1", 5)
 
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=20i,value2=0i 123450000000\n",
-			])
-		)
+        # Test InfluxDB
 
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter gauge\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 30\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 0',
-			])
-		)
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=10i,value2=100i 123450000000\n",
+                ]
+            ),
+        )
 
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter gauge\n",
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 5\n',
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 100',
+                ]
+            ),
+        )
 
-	def test_agg_counter_04(self):
-		"""
-		Non-resetable Aggregation Counter
-		min
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			tags={'foo': 'bar'},
-			init_values={'value1': 100, 'value2': 100},
-			aggregator=min,
-			reset=False
-		)
+    def test_agg_counter_05(self):
+        """
+        Resetable Aggregation Counter with dynamic tags
+        with init values
+        max
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter", init_values={"value1": 0, "value2": 0}, dynamic_tags=True
+        )
 
-		my_counter.set('value1', 20)
-		my_counter.set('value1', 10)
-		self.MetricsService._flush_metrics()
-		my_counter.set('value1', 5)
+        my_counter.set("value1", 20, {"foo": "bar"})
+        my_counter.set("value1", 10, {"foo": "bar"})
+        self.MetricsService._flush_metrics()
+        my_counter.set("value1", 30, {"foo": "bar"})
 
-		# Test InfluxDB
+        # Test InfluxDB
 
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=10i,value2=100i 123450000000\n",
-			])
-		)
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=0i,value2=0i 123450000000\n",
+                    "mycounter,foo=bar,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=20i,value2=0i 123450000000\n",
+                ]
+            ),
+        )
 
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter gauge\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 5\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 100',
-			])
-		)
-	def test_agg_counter_05(self):
-		"""
-		Resetable Aggregation Counter with dynamic tags
-		with init values
-		max
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			init_values={'value1': 0, 'value2': 0},
-			dynamic_tags=True
-		)
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter gauge\n",
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 0\n',
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 0\n',
+                    'mycounter{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 20\n',
+                    'mycounter{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 0',
+                ]
+            ),
+        )
 
-		my_counter.set('value1', 20, {'foo': 'bar'})
-		my_counter.set('value1', 10, {'foo': 'bar'})
-		self.MetricsService._flush_metrics()
-		my_counter.set('value1', 30, {'foo': 'bar'})
+    def test_agg_counter_06(self):
+        """
+        Resetable Aggregation Counter with dynamic tags
+        init_values
+        min
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter",
+            tags={"foo": "bar"},
+            init_values={"value1": 100, "value2": 100},
+            aggregator=min,
+            dynamic_tags=True,
+        )
 
-		# Test InfluxDB
+        my_counter.set("value1", 20, {"tag": "second"})
+        my_counter.set("value1", 10, {"tag": "second"})
+        self.MetricsService._flush_metrics()
 
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=0i,value2=0i 123450000000\n",
-				"mycounter,foo=bar,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=20i,value2=0i 123450000000\n",
-			])
-		)
+        # Test InfluxDB
 
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter gauge\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 0\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 0\n',
-				'mycounter{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 20\n',
-				'mycounter{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 0',
-			])
-		)
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=100i,value2=100i 123450000000\n",
+                    "mycounter,tag=second,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=10i,value2=100i 123450000000\n",
+                ]
+            ),
+        )
 
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter gauge\n",
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 100\n',
+                    'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 100\n',
+                    'mycounter{tag="second",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 10\n',
+                    'mycounter{tag="second",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 100',
+                ]
+            ),
+        )
 
-	def test_agg_counter_06(self):
-		"""
-		Resetable Aggregation Counter with dynamic tags
-		init_values
-		min
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			tags={'foo': 'bar'},
-			init_values={'value1': 100, 'value2': 100},
-			aggregator=min,
-			dynamic_tags=True
-		)
+    def test_agg_counter_07(self):
+        """
+        Non-resetable Aggregation Counter with dynamic tags
+        max
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter",
+            init_values={"value1": 0, "value2": 0},
+            reset=False,
+            dynamic_tags=True,
+        )
 
-		my_counter.set('value1', 20, {'tag': 'second'})
-		my_counter.set('value1', 10, {'tag': 'second'})
-		self.MetricsService._flush_metrics()
+        my_counter.set("value1", 20, {"foo": "bar"})
+        my_counter.set("value1", 10, {"foo": "bar"})
+        self.MetricsService._flush_metrics()
+        my_counter.set("value1", 30, {"foo": "bar"})
 
+        # Test InfluxDB
 
-		# Test InfluxDB
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=0i,value2=0i 123450000000\n",
+                    "mycounter,foo=bar,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=20i,value2=0i 123450000000\n",
+                ]
+            ),
+        )
 
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=100i,value2=100i 123450000000\n",
-				"mycounter,tag=second,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1,foo=bar value1=10i,value2=100i 123450000000\n",
-			])
-		)
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter counter\n",
+                    'mycounter_total{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 0\n',
+                    'mycounter_total{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 0\n',
+                    'mycounter_total{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 30\n',
+                    'mycounter_total{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 0',
+                ]
+            ),
+        )
 
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter gauge\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 100\n',
-				'mycounter{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 100\n',
-				'mycounter{tag="second",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value1"} 10\n',
-				'mycounter{tag="second",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",foo="bar",name="value2"} 100',
-			])
-		)
+    def test_agg_counter_08(self):
+        """
+        Non-resetable Aggregation Counter with dynamic tags
+        min
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter",
+            init_values={"value1": 100, "value2": 100},
+            aggregator=min,
+            reset=False,
+            dynamic_tags=True,
+        )
 
-	def test_agg_counter_07(self):
-		"""
-		Non-resetable Aggregation Counter with dynamic tags
-		max
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			init_values={'value1': 0, 'value2': 0},
-			reset=False,
-			dynamic_tags=True
-		)
+        my_counter.set("value1", 20, {"foo": "bar"})
+        my_counter.set("value1", 10, {"foo": "bar"})
+        self.MetricsService._flush_metrics()
+        my_counter.set("value1", 5, {"foo": "bar"})
 
-		my_counter.set('value1', 20, {'foo': 'bar'})
-		my_counter.set('value1', 10, {'foo': 'bar'})
-		self.MetricsService._flush_metrics()
-		my_counter.set('value1', 30, {'foo': 'bar'})
+        # Test InfluxDB
 
-		# Test InfluxDB
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=100i,value2=100i 123450000000\n",
+                    "mycounter,foo=bar,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=10i,value2=100i 123450000000\n",
+                ]
+            ),
+        )
 
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=0i,value2=0i 123450000000\n",
-				"mycounter,foo=bar,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=20i,value2=0i 123450000000\n",
-			])
-		)
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter counter\n",
+                    'mycounter_total{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 100\n',
+                    'mycounter_total{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 100\n',
+                    'mycounter_total{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 5\n',
+                    'mycounter_total{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 100',
+                ]
+            ),
+        )
 
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter counter\n',
-				'mycounter_total{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 0\n',
-				'mycounter_total{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 0\n',
-				'mycounter_total{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 30\n',
-				'mycounter_total{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 0',
-			])
-		)
+    def test_agg_counter_09(self):
+        """
+        Resetable Aggregation Counter with dynamic tags
+        w/o init_values
+        max
+        """
+        my_counter = self.MetricsService.create_aggregation_counter(
+            "mycounter", dynamic_tags=True
+        )
 
+        my_counter.set("value1", 20, {"foo": "bar"})
+        my_counter.set("value1", 10, {"foo": "bar"})
+        self.MetricsService._flush_metrics()
+        my_counter.set("value1", 30, {"foo": "bar"})
 
-	def test_agg_counter_08(self):
-		"""
-		Non-resetable Aggregation Counter with dynamic tags
-		min
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			init_values={'value1': 100, 'value2': 100},
-			aggregator=min,
-			reset=False,
-			dynamic_tags=True
-		)
+        # Test InfluxDB
 
-		my_counter.set('value1', 20, {'foo': 'bar'})
-		my_counter.set('value1', 10, {'foo': 'bar'})
-		self.MetricsService._flush_metrics()
-		my_counter.set('value1', 5, {'foo': 'bar'})
+        influxdb_format = asab.metrics.influxdb.influxdb_format(
+            self.MetricsService.Storage.Metrics, 123.45
+        )
+        self.assertEqual(
+            influxdb_format,
+            "".join(
+                [
+                    "mycounter,foo=bar,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=20i 123450000000\n",
+                ]
+            ),
+        )
 
-		# Test InfluxDB
-
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=100i,value2=100i 123450000000\n",
-				"mycounter,foo=bar,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=10i,value2=100i 123450000000\n",
-			])
-		)
-
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter counter\n',
-				'mycounter_total{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 100\n',
-				'mycounter_total{host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 100\n',
-				'mycounter_total{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 5\n',
-				'mycounter_total{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value2"} 100',
-			])
-		)
-
-	def test_agg_counter_09(self):
-		"""
-		Resetable Aggregation Counter with dynamic tags
-		w/o init_values
-		max
-		"""
-		my_counter = self.MetricsService.create_aggregation_counter(
-			"mycounter",
-			dynamic_tags=True
-		)
-
-		my_counter.set('value1', 20, {'foo': 'bar'})
-		my_counter.set('value1', 10, {'foo': 'bar'})
-		self.MetricsService._flush_metrics()
-		my_counter.set('value1', 30, {'foo': 'bar'})
-
-		# Test InfluxDB
-
-		influxdb_format = asab.metrics.influxdb.influxdb_format(self.MetricsService.Storage.Metrics, 123.45)
-		self.assertEqual(
-			influxdb_format,
-			''.join([
-				"mycounter,foo=bar,host=mockedhost.com,appclass=mockappclass,instance_id=test-instance-id-1 value1=20i 123450000000\n",
-			])
-		)
-
-		# Test OpenMetric
-		om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
-		self.assertEqual(
-			om_format,
-			''.join([
-				'# TYPE mycounter gauge\n',
-				'mycounter{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 20',
-			])
-		)
+        # Test OpenMetric
+        om_format = asab.metrics.openmetric.metric_to_openmetric(my_counter.Storage)
+        self.assertEqual(
+            om_format,
+            "".join(
+                [
+                    "# TYPE mycounter gauge\n",
+                    'mycounter{foo="bar",host="mockedhost.com",appclass="mockappclass",instance_id="test-instance-id-1",name="value1"} 20',
+                ]
+            ),
+        )

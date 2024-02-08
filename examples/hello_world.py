@@ -6,11 +6,11 @@ L = logging.getLogger(__name__)
 
 
 class MyApplication(asab.Application):
-	async def main(self):
-		L.warning("Hello world!")
-		self.stop()
+    async def main(self):
+        L.warning("Hello world!")
+        self.stop()
 
 
 if __name__ == "__main__":
-	app = MyApplication()
-	app.run()
+    app = MyApplication()
+    app.run()

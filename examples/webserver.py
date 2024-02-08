@@ -3,30 +3,29 @@ import asab.web.rest
 
 
 class MyApplication(asab.Application):
-	'''
-	Run by:  
-	`$ PYTHONPATH=.. ./webserver.py`
-	
-	The application is available at http://localhost:8080/hello
-	'''
+    """
+    Run by:
+    `$ PYTHONPATH=.. ./webserver.py`
 
-	def __init__(self):
-		super().__init__()
+    The application is available at http://localhost:8080/hello
+    """
 
-		# Create the Web server
-		web = asab.web.create_web_server(self)
+    def __init__(self):
+        super().__init__()
 
-		# Add a route to the handler method
-		web.add_get('/hello', self.hello)
+        # Create the Web server
+        web = asab.web.create_web_server(self)
 
-		print("Test with curl:\n\t$ curl http://localhost:8080/hello")
+        # Add a route to the handler method
+        web.add_get("/hello", self.hello)
+
+        print("Test with curl:\n\t$ curl http://localhost:8080/hello")
+
+    # This is the web request handler
+    async def hello(self, request):
+        return asab.web.rest.json_response(request, data="Hello, world!\n")
 
 
-	# This is the web request handler
-	async def hello(self, request):
-		return asab.web.rest.json_response(request, data="Hello, world!\n")
-
-
-if __name__ == '__main__':
-	app = MyApplication()
-	app.run()
+if __name__ == "__main__":
+    app = MyApplication()
+    app.run()

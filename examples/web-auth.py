@@ -28,225 +28,251 @@ asab.Config["auth"]["public_keys_url"] = "http://localhost:3081/.well-known/jwks
 
 
 class MyApplication(asab.Application):
+    def __init__(self):
+        super().__init__()
 
-	def __init__(self):
-		super().__init__()
+        # Initialize web container
+        self.add_module(asab.web.Module)
+        self.WebService = self.get_service("asab.WebService")
+        self.WebContainer = asab.web.WebContainer(self.WebService, "web")
 
-		# Initialize web container
-		self.add_module(asab.web.Module)
-		self.WebService = self.get_service("asab.WebService")
-		self.WebContainer = asab.web.WebContainer(self.WebService, "web")
+        self.WebContainer.WebApp.middlewares.append(
+            asab.web.rest.JsonExceptionMiddleware
+        )
 
-		self.WebContainer.WebApp.middlewares.append(asab.web.rest.JsonExceptionMiddleware)
+        from asab.api import ApiService
 
-		from asab.api import ApiService
-		self.ApiService = ApiService(self)
-		self.ApiService.initialize_web(self.WebContainer)
+        self.ApiService = ApiService(self)
+        self.ApiService.initialize_web(self.WebContainer)
 
-		# Initialize authorization
-		self.AuthService = asab.web.auth.AuthService(self)
-		self.AuthService.install(self.WebContainer)
+        # Initialize authorization
+        self.AuthService = asab.web.auth.AuthService(self)
+        self.AuthService.install(self.WebContainer)
 
-		# Add routes
-		self.WebContainer.WebApp.router.add_get("/no_auth", self.no_auth)
-		self.WebContainer.WebApp.router.add_get("/auth", self.auth)
-		self.WebContainer.WebApp.router.add_get("/auth/resource_check", self.auth_resource)
-		self.WebContainer.WebApp.router.add_put("/auth/resource_check", self.auth_resource_put)
-		self.WebContainer.WebApp.router.add_get("/{tenant}/required_tenant", self.tenant_in_path)
-		self.WebContainer.WebApp.router.add_get("/{tenant}/required_tenant/resource_check", self.tenant_in_path_resources)
-		self.WebContainer.WebApp.router.add_get("/configurable_tenant", self.tenant_in_query)
-		self.WebContainer.WebApp.router.add_get("/configurable_tenant/resource_check", self.tenant_in_query_resources)
+        # Add routes
+        self.WebContainer.WebApp.router.add_get("/no_auth", self.no_auth)
+        self.WebContainer.WebApp.router.add_get("/auth", self.auth)
+        self.WebContainer.WebApp.router.add_get(
+            "/auth/resource_check", self.auth_resource
+        )
+        self.WebContainer.WebApp.router.add_put(
+            "/auth/resource_check", self.auth_resource_put
+        )
+        self.WebContainer.WebApp.router.add_get(
+            "/{tenant}/required_tenant", self.tenant_in_path
+        )
+        self.WebContainer.WebApp.router.add_get(
+            "/{tenant}/required_tenant/resource_check", self.tenant_in_path_resources
+        )
+        self.WebContainer.WebApp.router.add_get(
+            "/configurable_tenant", self.tenant_in_query
+        )
+        self.WebContainer.WebApp.router.add_get(
+            "/configurable_tenant/resource_check", self.tenant_in_query_resources
+        )
 
+    @asab.web.auth.noauth
+    async def no_auth(self, request):
+        """
+        NO AUTH
+        - authentication skipped
 
-	@asab.web.auth.noauth
-	async def no_auth(self, request):
-		"""
-		NO AUTH
-		- authentication skipped
+        - `tenant`, `user_info`, `resources` params not allowed
+        """
+        data = {
+            "tenant": "NOT AVAILABLE",
+            "resources": "NOT AVAILABLE",
+            "user_info": "NOT AVAILABLE",
+        }
+        return asab.web.rest.json_response(request, data)
 
-		- `tenant`, `user_info`, `resources` params not allowed
-		"""
-		data = {
-			"tenant": "NOT AVAILABLE",
-			"resources": "NOT AVAILABLE",
-			"user_info": "NOT AVAILABLE",
-		}
-		return asab.web.rest.json_response(request, data)
+    async def auth(
+        self,
+        request,
+        *,
+        user_info: typing.Optional[dict],
+        resources: typing.Optional[frozenset]
+    ):
+        """
+        TENANT-AGNOSTIC
+        - returns 401 if authentication not successful
 
+        - `user_info`, `resources` params allowed
+        - `tenant` param not allowed
+        - `resources` contain only globally granted resources
+        """
+        data = {
+            "tenant": "NOT AVAILABLE",
+            "resources": list(resources) if resources else None,
+            "user_info": user_info,
+        }
+        return asab.web.rest.json_response(request, data)
 
-	async def auth(self, request, *, user_info: typing.Optional[dict], resources: typing.Optional[frozenset]):
-		"""
-		TENANT-AGNOSTIC
-		- returns 401 if authentication not successful
+    @asab.web.auth.require("something:access", "something:edit")
+    async def auth_resource(
+        self,
+        request,
+        *,
+        user_info: typing.Optional[dict],
+        resources: typing.Optional[frozenset]
+    ):
+        """
+        TENANT-AGNOSTIC + RESOURCE CHECK
+        - returns 401 if authentication not successful
+        - globally granted resources checked
+        - returns 403 if resource access not granted
 
-		- `user_info`, `resources` params allowed
-		- `tenant` param not allowed
-		- `resources` contain only globally granted resources
-		"""
-		data = {
-			"tenant": "NOT AVAILABLE",
-			"resources": list(resources) if resources else None,
-			"user_info": user_info,
-		}
-		return asab.web.rest.json_response(request, data)
+        - `user_info`, `resources` params allowed
+        - `tenant` param not allowed
+        - `resources` contain only globally granted resources
+        """
+        data = {
+            "tenant": "NOT AVAILABLE",
+            "resources": list(resources) if resources else None,
+            "user_info": user_info,
+        }
+        return asab.web.rest.json_response(request, data)
 
+    @asab.web.rest.json_schema_handler({"type": "object"})
+    @asab.web.auth.require("something:access", "something:edit")
+    async def auth_resource_put(
+        self,
+        request,
+        *,
+        user_info: typing.Optional[dict],
+        resources: typing.Optional[frozenset],
+        json_data: dict
+    ):
+        """
+        Decorator asab.web.auth.require can be used together with other decorators.
+        """
+        data = {
+            "tenant": "NOT AVAILABLE",
+            "resources": list(resources) if resources else None,
+            "user_info": user_info,
+            "json_data": json_data,
+        }
+        return asab.web.rest.json_response(request, data)
 
-	@asab.web.auth.require("something:access", "something:edit")
-	async def auth_resource(self, request, *, user_info: typing.Optional[dict], resources: typing.Optional[frozenset]):
-		"""
-		TENANT-AGNOSTIC + RESOURCE CHECK
-		- returns 401 if authentication not successful
-		- globally granted resources checked
-		- returns 403 if resource access not granted
+    async def tenant_in_path(
+        self,
+        request,
+        *,
+        tenant: typing.Optional[str],
+        user_info: typing.Optional[dict],
+        resources: typing.Optional[frozenset]
+    ):
+        """
+        TENANT-AWARE
+        - returns 401 if authentication not successful
+        - `tenant` access checked
+        - returns 403 if tenant not accessible
 
-		- `user_info`, `resources` params allowed
-		- `tenant` param not allowed
-		- `resources` contain only globally granted resources
-		"""
-		data = {
-			"tenant": "NOT AVAILABLE",
-			"resources": list(resources) if resources else None,
-			"user_info": user_info,
-		}
-		return asab.web.rest.json_response(request, data)
+        - `user_info`, `resources` params allowed
+        - `tenant` param required in path, cannot be None
+        - `resources` contain tenant-granted resources
+        """
+        data = {
+            "tenant": tenant,
+            "resources": list(resources) if resources else None,
+            "user_info": user_info,
+        }
+        return asab.web.rest.json_response(request, data)
 
+    async def tenant_in_query(
+        self,
+        request,
+        *,
+        tenant: typing.Optional[str],
+        user_info: typing.Optional[dict],
+        resources: typing.Optional[frozenset]
+    ):
+        """
+        CONFIGURABLY TENANT-AWARE
+        - returns 401 if authentication not successful
+        - if multitenancy is enabled
+                - `tenant` required in query string
+                - tenant access checked
+                - returns 400 if `tenant` not in query
+                - returns 403 if tenant not accessible
+        - if multitenancy is disabled
+                - `tenant` is set to `None`
 
-	@asab.web.rest.json_schema_handler({
-		"type": "object"
-	})
-	@asab.web.auth.require("something:access", "something:edit")
-	async def auth_resource_put(
-		self, request, *,
-		user_info: typing.Optional[dict],
-		resources: typing.Optional[frozenset],
-		json_data: dict
-	):
-		"""
-		Decorator asab.web.auth.require can be used together with other decorators.
-		"""
-		data = {
-			"tenant": "NOT AVAILABLE",
-			"resources": list(resources) if resources else None,
-			"user_info": user_info,
-			"json_data": json_data,
-		}
-		return asab.web.rest.json_response(request, data)
+        - `user_info`, `resources` params allowed
+        - `tenant` param required in query only if multitenancy is enabled
+        - `resources` contain tenant-granted resources if multitenancy is enabled,
+                otherwise only globally-granted resources
+        """
+        data = {
+            "tenant": tenant,
+            "resources": list(resources) if resources else None,
+            "user_info": user_info,
+        }
+        return asab.web.rest.json_response(request, data)
 
+    @asab.web.auth.require("something:access", "something:edit")
+    async def tenant_in_path_resources(
+        self,
+        request,
+        *,
+        tenant: typing.Optional[str],
+        user_info: typing.Optional[dict],
+        resources: typing.Optional[frozenset]
+    ):
+        """
+        TENANT-AWARE + RESOURCE CHECK
+        - returns 401 if authentication not successful
+        - `tenant` access checked
+        - returns 403 if tenant not accessible
+        - tenant-accessible resources checked
+        - returns 403 if resource access not granted
 
-	async def tenant_in_path(
-		self, request, *,
-		tenant: typing.Optional[str],
-		user_info: typing.Optional[dict],
-		resources: typing.Optional[frozenset]
-	):
-		"""
-		TENANT-AWARE
-		- returns 401 if authentication not successful
-		- `tenant` access checked
-		- returns 403 if tenant not accessible
+        - `user_info`, `resources` params allowed
+        - `tenant` param required, cannot be None
+        - `resources` contain only resources granted within tenant
+        """
+        data = {
+            "tenant": tenant,
+            "resources": list(resources) if resources else None,
+            "user_info": user_info,
+        }
+        return asab.web.rest.json_response(request, data)
 
-		- `user_info`, `resources` params allowed
-		- `tenant` param required in path, cannot be None
-		- `resources` contain tenant-granted resources
-		"""
-		data = {
-			"tenant": tenant,
-			"resources": list(resources) if resources else None,
-			"user_info": user_info,
-		}
-		return asab.web.rest.json_response(request, data)
+    @asab.web.auth.require("something:access", "something:edit")
+    async def tenant_in_query_resources(
+        self,
+        request,
+        *,
+        tenant: typing.Optional[str],
+        user_info: typing.Optional[dict],
+        resources: typing.Optional[frozenset]
+    ):
+        """
+        CONFIGURABLY TENANT-AWARE + RESOURCE CHECK
+        - returns 401 if authentication not successful
+        - if multitenancy is enabled
+                - `tenant` required in query string
+                - tenant access checked
+                - returns 400 if `tenant` not in query
+                - returns 403 if tenant not accessible
+                - returns 403 if resource access not granted within tenant
+        - if multitenancy is disabled
+                - `tenant` is set to `None`
+                - returns 403 if resources not granted globally
 
-
-	async def tenant_in_query(
-		self, request, *,
-		tenant: typing.Optional[str],
-		user_info: typing.Optional[dict],
-		resources: typing.Optional[frozenset]
-	):
-		"""
-		CONFIGURABLY TENANT-AWARE
-		- returns 401 if authentication not successful
-		- if multitenancy is enabled
-			- `tenant` required in query string
-			- tenant access checked
-			- returns 400 if `tenant` not in query
-			- returns 403 if tenant not accessible
-		- if multitenancy is disabled
-			- `tenant` is set to `None`
-
-		- `user_info`, `resources` params allowed
-		- `tenant` param required in query only if multitenancy is enabled
-		- `resources` contain tenant-granted resources if multitenancy is enabled,
-			otherwise only globally-granted resources
-		"""
-		data = {
-			"tenant": tenant,
-			"resources": list(resources) if resources else None,
-			"user_info": user_info,
-		}
-		return asab.web.rest.json_response(request, data)
-
-
-	@asab.web.auth.require("something:access", "something:edit")
-	async def tenant_in_path_resources(
-		self, request, *,
-		tenant: typing.Optional[str],
-		user_info: typing.Optional[dict],
-		resources: typing.Optional[frozenset]
-	):
-		"""
-		TENANT-AWARE + RESOURCE CHECK
-		- returns 401 if authentication not successful
-		- `tenant` access checked
-		- returns 403 if tenant not accessible
-		- tenant-accessible resources checked
-		- returns 403 if resource access not granted
-
-		- `user_info`, `resources` params allowed
-		- `tenant` param required, cannot be None
-		- `resources` contain only resources granted within tenant
-		"""
-		data = {
-			"tenant": tenant,
-			"resources": list(resources) if resources else None,
-			"user_info": user_info,
-		}
-		return asab.web.rest.json_response(request, data)
-
-
-	@asab.web.auth.require("something:access", "something:edit")
-	async def tenant_in_query_resources(
-		self, request, *,
-		tenant: typing.Optional[str],
-		user_info: typing.Optional[dict],
-		resources: typing.Optional[frozenset]
-	):
-		"""
-		CONFIGURABLY TENANT-AWARE + RESOURCE CHECK
-		- returns 401 if authentication not successful
-		- if multitenancy is enabled
-			- `tenant` required in query string
-			- tenant access checked
-			- returns 400 if `tenant` not in query
-			- returns 403 if tenant not accessible
-			- returns 403 if resource access not granted within tenant
-		- if multitenancy is disabled
-			- `tenant` is set to `None`
-			- returns 403 if resources not granted globally
-
-		- `user_info`, `resources` params allowed
-		- `tenant` param required only if multitenancy is enabled
-		- `resources` contain tenant-granted resources if multitenancy is enabled,
-			otherwise only globally-granted resources
-		"""
-		data = {
-			"tenant": tenant,
-			"resources": list(resources) if resources else None,
-			"user_info": user_info,
-		}
-		return asab.web.rest.json_response(request, data)
+        - `user_info`, `resources` params allowed
+        - `tenant` param required only if multitenancy is enabled
+        - `resources` contain tenant-granted resources if multitenancy is enabled,
+                otherwise only globally-granted resources
+        """
+        data = {
+            "tenant": tenant,
+            "resources": list(resources) if resources else None,
+            "user_info": user_info,
+        }
+        return asab.web.rest.json_response(request, data)
 
 
 if __name__ == "__main__":
-	app = MyApplication()
-	app.run()
+    app = MyApplication()
+    app.run()
